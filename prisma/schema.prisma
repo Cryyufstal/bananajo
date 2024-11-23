@@ -1,19 +1,31 @@
-datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "mongodb"
+  url      = "mongodb+srv://erenoiz2w1:HN6zAWz5FmLvLz5g@veltura.oyzyg.mongodb.net/veltura_database?retryWrites=true&w=majority&appName=VELTURA"
+}
+
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  telegramId Int     @unique
-  username   String?
-  firstName  String?
-  lastName   String?
-  points     Int     @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(cuid()) @map("_id")
+  telegramId    Int     @unique
+  username      String?
+  firstName     String?
+  lastName      String?
+  points        Int     @default(0)
+  referralCount Int     @default(0)
+  autoBoostLevel Int    @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SocialReward {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  telegramId Int
+  platform   String
+  reward     Int
+  claimedAt  DateTime @default(now())
+
+  @@unique([telegramId, platform])
 }
