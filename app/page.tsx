@@ -1,101 +1,181 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { WebApp } from '@twa-dev/types'
+import { useEffect, useState, useCallback, memo } from 'react'
+import { Header, HomeView, BoostView, FriendsView, EarnView, Navigation, SettingsModal } from './components/GameComponents'
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp: WebApp
-    }
-  }
+interface User {
+  id: string
+  telegramId: number
+  username: string
+  firstName: string
+  lastName: string
+  points: number
+  referralCount: number
+  autoBoostLevel: number
+  lastSeen: Date
 }
 
+// Memo ile optimize edilmiş bileşenler
+const MemoizedHeader = memo(Header)
+const MemoizedHomeView = memo(HomeView)
+const MemoizedBoostView = memo(BoostView)
+const MemoizedFriendsView = memo(FriendsView)
+const MemoizedEarnView = memo(EarnView)
+const MemoizedNavigation = memo(Navigation)
+const MemoizedSettingsModal = memo(SettingsModal)
+
 export default function Home() {
-  const [user, setUser] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notification, setNotification] = useState('')
+  const [user, setUser] = useState<User | null>(null)
+  const [currentView, setCurrentView] = useState('home')
+  const [showSettings, setShowSettings] = useState(false)
+  const [isRotating, setIsRotating] = useState(false)
+  const [miningStreak, setMiningStreak] = useState(0)
+  const [autoBoostLevel, setAutoBoostLevel] = useState(1)
+  const [lastMiningTime, setLastMiningTime] = useState(0)
+  const [isMining, setIsMining] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-      const tg = window.Telegram.WebApp
-      tg.ready()
-
-      const initData = tg.initData || ''
-      const initDataUnsafe = tg.initDataUnsafe || {}
-
-      if (initDataUnsafe.user) {
-        fetch('/api/user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(initDataUnsafe.user),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.error) {
-              setError(data.error)
-            } else {
-              setUser(data)
-            }
-          })
-          .catch((err) => {
-            setError('Failed to fetch user data')
-          })
-      } else {
-        setError('No user data available')
+  const fetchUserData = useCallback(async () => {
+    const telegram = window.Telegram.WebApp
+    try {
+      const response = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(telegram.initDataUnsafe.user)
+      })
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData)
+        setAutoBoostLevel(userData.autoBoostLevel)
       }
-    } else {
-      setError('This app should be opened in Telegram')
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
-  const handleIncreasePoints = async () => {
-    if (!user) return
+  useEffect(() => {
+    const telegram = window.Telegram.WebApp
+    telegram.ready()
+    telegram.expand()
+    fetchUserData()
+
+    const keepAlive = setInterval(fetchUserData, 30000)
+    return () => clearInterval(keepAlive)
+  }, [fetchUserData])
+
+  const handleMining = useCallback(async () => {
+    if (!user?.telegramId || isMining) return
+
+    const currentTime = Date.now()
+    if (currentTime - lastMiningTime < 200) return
+    
+    setIsMining(true)
+    setLastMiningTime(currentTime)
+    setIsRotating(true)
 
     try {
-      const res = await fetch('/api/increase-points', {
+      const points = autoBoostLevel * 2
+      const response = await fetch('/api/increase-points', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ telegramId: user.telegramId }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: user.telegramId,
+          points: points
+        })
       })
-      const data = await res.json()
-      if (data.success) {
-        setUser({ ...user, points: data.points })
-        setNotification('Points increased successfully!')
-        setTimeout(() => setNotification(''), 3000)
-      } else {
-        setError('Failed to increase points')
+      
+      if (response.ok) {
+        const updatedUser = await response.json()
+        setUser(updatedUser)
+        setMiningStreak(prev => (prev + 1) % 5)
       }
-    } catch (err) {
-      setError('An error occurred while increasing points')
+    } catch (error) {
+      console.error('Mining error:', error)
+    } finally {
+      setTimeout(() => {
+        setIsRotating(false)
+        setIsMining(false)
+      }, 100)
     }
-  }
+  }, [user?.telegramId, isMining, lastMiningTime, autoBoostLevel])
 
-  if (error) {
-    return <div className="container mx-auto p-4 text-red-500">{error}</div>
-  }
+  const handleBoostUpgrade = useCallback(async (level: number, cost: number) => {
+    if (!user?.telegramId || user.points < cost || autoBoostLevel >= level) return
 
-  if (!user) return <div className="container mx-auto p-4">Loading...</div>
+    try {
+      const response = await fetch('/api/upgrade-boost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: user.telegramId,
+          level: level,
+          cost: cost
+        })
+      })
+      
+      if (response.ok) {
+        const updatedUser = await response.json()
+        setUser(updatedUser)
+        setAutoBoostLevel(level)
+        await fetchUserData()
+      }
+    } catch (error) {
+      console.error('Upgrade error:', error)
+    }
+  }, [user?.telegramId, user?.points, autoBoostLevel, fetchUserData])
+
+  const handleShare = useCallback(() => {
+    const telegram = window.Telegram.WebApp
+    telegram.switchInlineQuery(`Join Veltura Mining! Use my referral link: https://t.me/VelturaMiningBot?start=${user?.telegramId}`)
+  }, [user?.telegramId])
+
+  if (isLoading) return null
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Welcome, {user.firstName}!</h1>
-      <p>Your current points: {user.points}</p>
-      <button
-        onClick={handleIncreasePoints}
-        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
-      >
-        Increase Points
-      </button>
-      {notification && (
-        <div className="mt-4 p-2 bg-green-100 text-green-700 rounded">
-          {notification}
-        </div>
+    <main className="game-container">
+      <MemoizedHeader 
+        user={user} 
+        showSettings={showSettings} 
+        setShowSettings={setShowSettings} 
+      />
+      {currentView === 'home' && (
+        <MemoizedHomeView
+          user={user}
+          handleMining={handleMining}
+          isRotating={isRotating}
+          miningStreak={miningStreak}
+          autoBoostLevel={autoBoostLevel}
+        />
       )}
-    </div>
+      {currentView === 'boost' && (
+        <MemoizedBoostView
+          user={user}
+          autoBoostLevel={autoBoostLevel}
+          handleBoostUpgrade={handleBoostUpgrade}
+        />
+      )}
+      {currentView === 'friends' && (
+        <MemoizedFriendsView 
+          user={user} 
+          handleShare={handleShare} 
+        />
+      )}
+      {currentView === 'earn' && (
+        <MemoizedEarnView 
+          user={user} 
+          onRewardClaimed={fetchUserData} 
+        />
+      )}
+      <MemoizedNavigation 
+        currentView={currentView} 
+        setCurrentView={setCurrentView} 
+      />
+      {showSettings && (
+        <MemoizedSettingsModal 
+          onClose={() => setShowSettings(false)} 
+          user={user} 
+        />
+      )}
+    </main>
   )
 }
