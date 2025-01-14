@@ -1,7 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import BottomNavigation from '@/components/BottomNavigation';
+import { useEffect, useState, useCallback } from 'react';
+import { WebApp } from '@twa-dev/types';
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: WebApp;
+    };
+  }
+}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -10,10 +18,37 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/user')
-      .then((res) => res.json())
-      .then((data) => setUser(data))
-      .catch(() => setError('Failed to fetch user data'));
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+
+      const initDataUnsafe = tg.initDataUnsafe || {};
+
+      if (initDataUnsafe.user) {
+        fetch('/api/user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(initDataUnsafe.user),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              setError(data.error);
+            } else {
+              setUser(data);
+            }
+          })
+          .catch(() => {
+            setError('Failed to fetch user data');
+          });
+      } else {
+        setError('No user data available');
+      }
+    } else {
+      setError('This app should be opened in Telegram');
+    }
   }, []);
 
   const handleIncreasePoints = useCallback(async () => {
@@ -45,7 +80,9 @@ export default function Home() {
     }
   }, [user]);
 
-  if (error) return <div className="container mx-auto p-4 text-red-500">{error}</div>;
+  if (error) {
+    return <div className="container mx-auto p-4 text-red-500">{error}</div>;
+  }
 
   if (!user) return <div className="container mx-auto p-4">Loading...</div>;
 
@@ -67,7 +104,6 @@ export default function Home() {
           {notification}
         </div>
       )}
-      <BottomNavigation />
     </div>
   );
-}
+    }
