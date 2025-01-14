@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import BottomNavigation from '../components/BottomNavigation';
+import BottomNavigation from '@/components/BottomNavigation';
 
 export default function SecondPage() {
   const [data, setData] = useState<any>(null);
