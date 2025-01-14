@@ -1,40 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // تأكد أن prisma تم إعدادها بشكل صحيح
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest) {
-  try {
-    // استلام بيانات المستخدم من الطلب
-    const userData = await req.json();
+    try {
+        const { telegramId } = await req.json()
 
-    // التحقق من صحة البيانات
-    if (!userData || !userData.id) {
-      return NextResponse.json({ error: 'Invalid user data' }, { status: 400 });
+        if (!telegramId) {
+            return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 })
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { telegramId },
+            data: { points: { increment: 1 } }
+        })
+
+        return NextResponse.json({ success: true, points: updatedUser.points })
+    } catch (error) {
+        console.error('Error increasing points:', error)
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
-
-    // البحث عن المستخدم في قاعدة البيانات باستخدام Telegram ID
-    let user = await prisma.user.findUnique({
-      where: { telegramId: userData.id },
-    });
-
-    // إذا لم يتم العثور على المستخدم، قم بإنشائه
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          telegramId: userData.id,
-          username: userData.username || '',
-          firstName: userData.first_name || '',
-          lastName: userData.last_name || '',
-        },
-      });
-    }
-
-    // إرجاع بيانات المستخدم كاستجابة
-    return NextResponse.json(user, { status: 200 });
-  } catch (error) {
-    console.error('Error processing user data:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
-  }
 }
