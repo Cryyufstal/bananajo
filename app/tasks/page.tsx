@@ -1,37 +1,90 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+'use client';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
+import { useEffect, useState } from 'react';
+
+interface Task {
+  id: string;
+  title: string;
+  url: string;
+  status: string;
+}
+
+export default function TasksPage() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch tasks from the API
+    fetch('/api/tasks')
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch tasks');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setTasks(data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setIsLoading(false);
+      });
+  }, []);
+
+  const handleCompleteTask = async (taskId: string) => {
     try {
-      const tasks = await prisma.task.findMany();
-      res.status(200).json(tasks);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const { title, url } = req.body;
-
-      if (!title || !url) {
-        return res.status(400).json({ error: 'Invalid task data' });
-      }
-
-      const task = await prisma.task.create({
-        data: {
-          title,
-          url,
-          status: "pending",
-        },
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, status: 'completed' }),
       });
 
-      res.status(201).json(task);
-    } catch (error) {
-      console.error('Error creating task:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      if (!res.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === taskId ? { ...task, status: 'completed' } : task
+        )
+      );
+    } catch (err) {
+      setError(err.message);
     }
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
+  };
+
+  if (isLoading) {
+    return <div>Loading tasks...</div>;
   }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Tasks</h1>
+      <ul>
+        {tasks.map((task) => (
+          <li key={task.id} className="mb-4">
+            <div>
+              <h2 className="text-xl">{task.title}</h2>
+              <p>Status: {task.status}</p>
+              {task.status === 'pending' && (
+                <button
+                  className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+                  onClick={() => handleCompleteTask(task.id)}
+                >
+                  Complete Task
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
+
