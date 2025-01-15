@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import BottomNavigation from '@/components/BottomNavigation';  // استيراد الشريط السفلي
 
 declare global {
   interface Window {
@@ -59,6 +60,9 @@ export default function Home() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Welcome, {user.firstName}!</h1>
       <p>Your current points: {user.points}</p>
+
+      {/* إضافة الشريط السفلي */}
+      <BottomNavigation />
     </div>
   );
 }
