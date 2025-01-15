@@ -10,20 +10,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Error fetching tasks:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
-  } else if (req.method === 'POST') {
+  } else if (req.method === 'PATCH') {
+    const { id, status } = req.body;
+
+    if (!id || !status) {
+      return res.status(400).json({ error: 'Invalid data' });
+    }
+
     try {
-      const { id, status } = req.body;
-
-      if (!id || !status) {
-        return res.status(400).json({ error: 'Invalid task data' });
-      }
-
-      const task = await prisma.task.update({
+      const updatedTask = await prisma.task.update({
         where: { id },
         data: { status },
       });
 
-      res.status(200).json(task);
+      res.status(200).json(updatedTask);
     } catch (error) {
       console.error('Error updating task:', error);
       res.status(500).json({ error: 'Internal server error' });
