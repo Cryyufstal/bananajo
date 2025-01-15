@@ -1,7 +1,14 @@
-// app/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: any;
+    };
+  }
+}
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
