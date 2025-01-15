@@ -15,7 +15,6 @@ export default function TasksPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch tasks from the API
     fetch('/api/tasks')
       .then((response) => {
         if (!response.ok) {
@@ -28,7 +27,11 @@ export default function TasksPage() {
         setIsLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('An unknown error occurred');
+        }
         setIsLoading(false);
       });
   }, []);
@@ -45,13 +48,19 @@ export default function TasksPage() {
         throw new Error('Failed to update task');
       }
 
+      const updatedTask = await res.json();
+
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
           task.id === taskId ? { ...task, status: 'completed' } : task
         )
       );
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     }
   };
 
@@ -87,4 +96,3 @@ export default function TasksPage() {
     </div>
   );
 }
-
