@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import BottomNavigation from '@/components/BottomNavigation';  // استيراد الشريط السفلي
+import BottomNavigation from '@/components/BottomNavigation'; // استيراد الشريط السفلي
 
 declare global {
   interface Window {
@@ -14,6 +14,7 @@ declare global {
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [points, setPoints] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
@@ -36,6 +37,7 @@ export default function Home() {
               setError(data.error);
             } else {
               setUser(data);
+              setPoints(data.points || 0); // إعداد النقاط من البيانات القادمة
             }
           })
           .catch((err) => {
@@ -50,6 +52,21 @@ export default function Home() {
     }
   }, []);
 
+  const handleImageClick = () => {
+    const newPoints = points + 1;
+    setPoints(newPoints);
+
+    fetch('/api/points', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ points: newPoints }),
+    }).catch((err) => {
+      console.error('Error updating points:', err);
+    });
+  };
+
   if (error) {
     return <div className="container mx-auto p-4 text-red-500">{error}</div>;
   }
@@ -57,9 +74,25 @@ export default function Home() {
   if (!user) return <div className="container mx-auto p-4">Loading...</div>;
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 bg-gray-100">
+      {/* خط علوي */}
+      <hr className="border-t-4 border-gray-300 mb-4" />
+
       <h1 className="text-2xl font-bold mb-4">Welcome, {user.firstName}!</h1>
-      <p>Your current points: {user.points}</p>
+      <p>Your current points: {points}</p>
+
+      {/* صورة قابلة للنقر */}
+      <div className="my-4 text-center">
+        <img
+          src="../images/background.png"
+          alt="Click me"
+          className="cursor-pointer mx-auto w-32 h-32"
+          onClick={handleImageClick}
+        />
+      </div>
+
+      {/* خط سفلي */}
+      <hr className="border-t-4 border-gray-300 mt-4" />
 
       {/* إضافة الشريط السفلي */}
       <BottomNavigation />
