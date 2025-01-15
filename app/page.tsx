@@ -10,6 +10,7 @@ declare global {
     };
   }
 }
+
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,4 +66,3 @@ export default function Home() {
     </div>
   );
 }
-
